@@ -39,9 +39,9 @@ def imprimir_bloco_dispatcher(processo):
     print()
 
 
-def executar(processo, quanta):
+def executar(processo, quantum):
     """
-    Simula a execucao do processo por 'quanta' instrucoes, imprimindo as
+    Simula a execucao do processo por 'quantum' instrucoes, imprimindo as
     mensagens de execucao. Imprime STARTED na primeira vez e return SIGINT
     quando o processo termina.
     """
@@ -51,11 +51,11 @@ def executar(processo, quanta):
         processo.iniciado = True
 
     ja_executadas = processo.tempo_processador - processo.tempo_restante
-    for _ in range(quanta):
+    for _ in range(quantum):
         ja_executadas += 1
         print("P{} instruction {}".format(processo.pid, ja_executadas))
 
-    processo.tempo_restante -= quanta
+    processo.tempo_restante -= quantum
     if processo.terminou:
         print("P{} return SIGINT".format(processo.pid))
     print()

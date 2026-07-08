@@ -48,7 +48,14 @@ def ler_processos(caminho):
 
 def ler_strings_referencia(caminho, processos):
     """
-    Le string.txt. A linha i contem a string de referencia do processo i.
+    Le string.txt. A linha i contem a string de referencia do processo i
+    (associacao feita pela ordem: processos[i]).
+
+    Formato de cada linha:
+    <pagina_1>, <pagina_2>, ..., <pagina_n>
+
+    Onde cada <pagina_k> e o numero (int) da pagina logica acessada pelo
+    processo naquele passo, na ordem em que os acessos ocorrem.
     """
     with open(caminho, "r") as arquivo:
         linhas = [l for l in arquivo if l.strip() != ""]
@@ -62,10 +69,30 @@ def ler_arquivos(caminho):
     """
     Le files.txt e devolve (total_blocos, preexistentes, operacoes).
 
-    - total_blocos : quantidade total de blocos do disco.
-    - preexistentes: lista de (nome, primeiro_bloco, quantidade_blocos).
-    - operacoes    : lista de dicts com pid, codigo (0=criar, 1=deletar),
-                     nome e blocos (apenas para criacao).
+    Formato do arquivo:
+    <total_blocos>
+    <qtd_segmentos_preexistentes>
+    <nome>, <primeiro_bloco>, <quantidade_blocos>   (uma linha por segmento preexistente)
+    ...
+    <pid>, <codigo>, <nome>[, <blocos>]             (uma linha por operacao)
+    ...
+
+    Onde:
+    - total_blocos: quantidade total de blocos do disco (int).
+    - qtd_segmentos_preexistentes: quantidade de segmentos ja alocados
+      no disco antes do inicio da simulacao (int).
+    - Cada segmento preexistente e definido por nome, bloco inicial e
+      quantidade de blocos ocupados.
+    - codigo da operacao: 0 = criar arquivo, 1 = deletar arquivo.
+    - <blocos> (quantidade de blocos a alocar) so aparece quando
+      codigo == 0 (criacao); em operacoes de delecao a linha tem
+      apenas pid, codigo e nome.
+
+    Retorno:
+    - total_blocos : int, quantidade total de blocos do disco.
+    - preexistentes: lista de tuplas (nome, primeiro_bloco, quantidade_blocos).
+    - operacoes    : lista de dicts com chaves "pid", "codigo", "nome" e
+                     "blocos" (None quando a operacao nao for de criacao).
     """
     with open(caminho, "r") as arquivo:
         linhas = [l for l in arquivo if l.strip() != ""]

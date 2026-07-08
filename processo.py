@@ -17,7 +17,7 @@ class Processo:
         self.pid = pid                                  # identificador (0..N-1)
         self.tempo_inicializacao = tempo_inicializacao  # instante de chegada
         self.prioridade = prioridade                    # 0 = tempo real; 1..3 = usuario
-        self.tempo_processador = tempo_processador      # total de instrucoes (quanta)
+        self.tempo_processador = tempo_processador      # total de instrucoes (quantum)
         self.tamanho_working_set = tamanho_working_set  # nro maximo de frames
 
         # Requisicoes de recursos de E/S (0 ou 1)
@@ -27,7 +27,7 @@ class Processo:
         self.usa_sata = usa_sata
 
         # ---- Estado dinamico ----
-        self.tempo_restante = tempo_processador   # quanta ainda a executar
+        self.tempo_restante = tempo_processador   # quantum ainda a executar
         self.faltas_paginas = 0                   # page faults contabilizados
         self.string_referencia = []               # sequencia de paginas referenciadas
         self.frames_alocados = []                 # indices dos frames que o processo possui

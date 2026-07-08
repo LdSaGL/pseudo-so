@@ -11,3 +11,9 @@ Paginacao -> tecnica que o SO usa para gerenciar memoria dividindo-a em blocos d
 Memoria Virtual -> abstracao que usa paginacao para dar a ilusao que cada proceso tem um espaco de enderecamento proprio, continuo e maior que a RAM disponivel
 
 LRU -> pagina que nao eh utilizada ha mais tempo eh a primeira da lista para ser substituida
+
+Alocacao Contigua -> o arquivo aloca em memoria em blocos contiguos, ou seja, ininterruptos na memoria
+
+First-fit -> percorre os blocos libres e escolhe o primeiro bloco encontrado em que caiba o processo
+
+PID -> Process Identifier
