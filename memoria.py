@@ -32,6 +32,23 @@ class GerenciadorMemoria:
             return self.livres_tempo_real
         return self.livres_usuario
 
+    def _capacidade(self, processo):
+        """Capacidade TOTAL (livre + ocupada) da area do processo."""
+        if processo.eh_tempo_real:
+            return self.FRAMES_TEMPO_REAL
+        return self.FRAMES_USUARIO
+
+    def cabe_na_area(self, processo):
+        """
+        Indica se o working set do processo cabe na capacidade TOTAL da sua
+        area de memoria, ainda que no momento a area esteja ocupada.
+
+        Diferente de 'tem_espaco', que verifica a disponibilidade atual, este
+        metodo detecta processos impossiveis de admitir (working set maior que
+        toda a area reservada), evitando reenfileiramento infinito.
+        """
+        return processo.tamanho_working_set <= self._capacidade(processo)
+
     def tem_espaco(self, processo):
         """Verifica se ha frames livres suficientes para o working set."""
         return len(self._pool(processo)) >= processo.tamanho_working_set

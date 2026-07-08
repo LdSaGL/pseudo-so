@@ -27,8 +27,24 @@ class SistemaArquivos:
     # Configuracao inicial
     # ------------------------------------------------------------------ #
     def adicionar_preexistente(self, nome, inicio, tamanho):
-        """Registra um arquivo ja gravado no disco na carga inicial."""
+        """
+        Registra um arquivo ja gravado no disco na carga inicial.
+
+        Valida a geometria do segmento antes de escrever: um segmento que
+        comeca fora do disco, tem tamanho negativo ou ultrapassa o ultimo
+        bloco e uma configuracao impossivel (analoga a pedir mais disco do
+        que existe) e gera erro claro em vez de corromper o disco/estourar.
+        """
+        if inicio < 0 or tamanho < 0 or inicio + tamanho > self.total_blocos:
+            raise ValueError(
+                "Segmento pre-existente {} (inicio {}, tamanho {}) nao cabe "
+                "no disco de {} blocos.".format(
+                    nome, inicio, tamanho, self.total_blocos))
         for bloco in range(inicio, inicio + tamanho):
+            if self.disco[bloco] is not None:
+                raise ValueError(
+                    "Segmento pre-existente {} sobrepoe o bloco {}, ja "
+                    "ocupado por {}.".format(nome, bloco, self.disco[bloco]))
             self.disco[bloco] = nome
         self.arquivos[nome] = {"inicio": inicio, "tamanho": tamanho,
                                "dono": None}

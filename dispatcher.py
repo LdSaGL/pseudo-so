@@ -62,6 +62,44 @@ def executar(processo, quantum):
 
 
 # ---------------------------------------------------------------------- #
+# Admissao
+# ---------------------------------------------------------------------- #
+def admitir_ou_rejeitar(processo, memoria):
+    """
+    Verifica se um processo recem-selecionado pode ser admitido.
+
+    Retorna False (e imprime o motivo) quando o processo e impossivel de
+    executar e deve ser descartado em vez de reenfileirado, evitando que o
+    escalonador entre em laco infinito. Sao dois casos:
+
+      - working set maior que toda a area de memoria da sua classe
+        (jamais havera frames suficientes, mesmo com a memoria vazia);
+      - tempo de processador nao positivo (nao ha instrucoes a executar).
+
+    Processos validos retornam True e seguem para o fluxo normal.
+    """
+    if processo.tamanho_working_set <= 0:
+        print("process {} =>".format(processo.pid))
+        print("P{} rejeitado: working set invalido ({}); precisa de ao menos "
+              "1 frame".format(processo.pid, processo.tamanho_working_set))
+        print()
+        return False
+    if not memoria.cabe_na_area(processo):
+        print("process {} =>".format(processo.pid))
+        print("P{} rejeitado: working set ({}) excede a memoria da area"
+              .format(processo.pid, processo.tamanho_working_set))
+        print()
+        return False
+    if processo.tempo_processador <= 0:
+        print("process {} =>".format(processo.pid))
+        print("P{} rejeitado: sem instrucoes a executar (tempo {})"
+              .format(processo.pid, processo.tempo_processador))
+        print()
+        return False
+    return True
+
+
+# ---------------------------------------------------------------------- #
 # Escalonador
 # ---------------------------------------------------------------------- #
 def escalonar(processos, memoria, recursos, filas):
@@ -71,12 +109,20 @@ def escalonar(processos, memoria, recursos, filas):
     - Processos de tempo real: fila FIFO, executados ate o fim SEM preempcao.
     - Processos de usuario: MLFQ com quantum de 1 (preempcao), rebaixamento
       apos gastar o quantum (feedback) e envelhecimento (aging).
+    - Um processo de usuario que nao pode iniciar por falta de memoria/E/S vai
+      para o estado BLOQUEADO (sai da fila de prontos) em vez de ser
+      reescolhido em busy-wait; volta a competir quando outro processo termina
+      e libera os recursos.
     """
     nao_admitidos = sorted(processos,
                            key=lambda p: (p.tempo_inicializacao, p.pid))
     tempo = 0
     total = len(processos)
     finalizados = 0
+
+    def pode_rodar(processo):
+        """O processo tem memoria e recursos de E/S disponiveis agora?"""
+        return memoria.tem_espaco(processo) and recursos.pode_alocar(processo)
 
     while finalizados < total:
         # Admite os processos que ja chegaram (tempo de inicializacao <= tempo).
@@ -93,6 +139,9 @@ def escalonar(processos, memoria, recursos, filas):
         # Prioridade absoluta para tempo real (FIFO, sem preempcao).
         if filas.ha_tempo_real():
             processo = filas.proximo_tempo_real()
+            if not admitir_ou_rejeitar(processo, memoria):
+                finalizados += 1
+                continue
             memoria.alocar(processo)
             processo.faltas_paginas = GerenciadorMemoria.simular_lru(
                 processo.string_referencia, processo.tamanho_working_set)
@@ -106,12 +155,18 @@ def escalonar(processos, memoria, recursos, filas):
         # Processos de usuario: MLFQ com quantum de 1.
         processo = filas.proximo_usuario()
 
+        # Admissao: descarta processos impossiveis de carregar (working set
+        # maior que a area de memoria) ou sem instrucoes a executar.
+        if not admitir_ou_rejeitar(processo, memoria):
+            finalizados += 1
+            continue
+
         # Na primeira execucao, garante memoria e recursos de E/S.
         if not processo.iniciado:
-            if not memoria.tem_espaco(processo) or not recursos.pode_alocar(processo):
-                filas.inserir(processo)      # sem recursos: volta para a fila
-                filas.envelhecer(processo)
-                tempo += 1
+            if not pode_rodar(processo):
+                # Sem recursos: BLOQUEIA (sai da fila de prontos). Nao consome
+                # quantum nem avanca o relogio; volta quando algo for liberado.
+                filas.bloquear(processo)
                 continue
             memoria.alocar(processo)
             recursos.alocar(processo)
@@ -126,6 +181,9 @@ def escalonar(processos, memoria, recursos, filas):
             recursos.liberar(processo)
             memoria.liberar(processo)
             finalizados += 1
+            # Recursos liberados: reavalia quem estava bloqueado e devolve a
+            # fila de prontos os que agora podem rodar.
+            filas.desbloquear(pode_rodar)
         else:
             filas.rebaixar(processo)         # realimentacao (feedback)
         filas.envelhecer(processo)           # envelhecimento (aging)
@@ -188,18 +246,26 @@ def main():
     caminho_arquivos = sys.argv[2]
     caminho_strings = sys.argv[3]
 
-    # Leitura das entradas.
-    processos = ler_processos(caminho_processos)
-    ler_strings_referencia(caminho_strings, processos)
-    total_blocos, preexistentes, operacoes = ler_arquivos(caminho_arquivos)
+    # Leitura das entradas (formato validado no leitor).
+    try:
+        processos = ler_processos(caminho_processos)
+        ler_strings_referencia(caminho_strings, processos)
+        total_blocos, preexistentes, operacoes = ler_arquivos(caminho_arquivos)
+    except (ValueError, OSError) as erro:
+        print("Erro na leitura das entradas: {}".format(erro))
+        return
 
     # Gerenciadores.
     memoria = GerenciadorMemoria()
     recursos = GerenciadorRecursos()
     filas = GerenciadorFilas()
     sistema_arquivos = SistemaArquivos(total_blocos)
-    for nome, inicio, tamanho in preexistentes:
-        sistema_arquivos.adicionar_preexistente(nome, inicio, tamanho)
+    try:
+        for nome, inicio, tamanho in preexistentes:
+            sistema_arquivos.adicionar_preexistente(nome, inicio, tamanho)
+    except ValueError as erro:
+        print("Erro na configuracao do disco: {}".format(erro))
+        return
 
     # Execucao.
     escalonar(processos, memoria, recursos, filas)
