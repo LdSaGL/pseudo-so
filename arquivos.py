@@ -30,11 +30,17 @@ class SistemaArquivos:
         """
         Registra um arquivo ja gravado no disco na carga inicial.
 
-        Valida a geometria do segmento antes de escrever: um segmento que
-        comeca fora do disco, tem tamanho negativo ou ultrapassa o ultimo
-        bloco e uma configuracao impossivel (analoga a pedir mais disco do
-        que existe) e gera erro claro em vez de corromper o disco/estourar.
+        Valida TUDO antes de escrever (operacao atomica): um segmento que
+        comeca fora do disco, ultrapassa o ultimo bloco, sobrepoe outro
+        arquivo ou repete um nome ja usado e uma configuracao impossivel
+        (analoga a pedir mais disco do que existe) e gera erro claro em vez
+        de corromper o disco/estourar. Quem chama decide ignorar o segmento
+        e seguir com a simulacao.
         """
+        if nome in self.arquivos:
+            raise ValueError(
+                "Segmento pre-existente {} repete um nome ja usado no "
+                "disco.".format(nome))
         if inicio < 0 or tamanho < 0 or inicio + tamanho > self.total_blocos:
             raise ValueError(
                 "Segmento pre-existente {} (inicio {}, tamanho {}) nao cabe "
@@ -45,6 +51,7 @@ class SistemaArquivos:
                 raise ValueError(
                     "Segmento pre-existente {} sobrepoe o bloco {}, ja "
                     "ocupado por {}.".format(nome, bloco, self.disco[bloco]))
+        for bloco in range(inicio, inicio + tamanho):
             self.disco[bloco] = nome
         self.arquivos[nome] = {"inicio": inicio, "tamanho": tamanho,
                                "dono": None}

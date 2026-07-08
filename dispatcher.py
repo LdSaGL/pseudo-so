@@ -64,37 +64,38 @@ def executar(processo, quantum):
 # ---------------------------------------------------------------------- #
 # Admissao
 # ---------------------------------------------------------------------- #
+def _aviso(mensagem):
+    """Diagnostico em stderr; o stdout fica so com a saida do enunciado."""
+    print("[aviso] {}".format(mensagem), file=sys.stderr)
+
+
 def admitir_ou_rejeitar(processo, memoria):
     """
     Verifica se um processo recem-selecionado pode ser admitido.
 
-    Retorna False (e imprime o motivo) quando o processo e impossivel de
-    executar e deve ser descartado em vez de reenfileirado, evitando que o
-    escalonador entre em laco infinito. Sao dois casos:
+    Retorna False (com o motivo avisado em stderr) quando o processo e
+    impossivel de executar e deve ser descartado em vez de reenfileirado,
+    evitando que o escalonador entre em laco infinito. Sao dois casos:
 
-      - working set maior que toda a area de memoria da sua classe
+      - working set invalido ou maior que toda a area de memoria da classe
         (jamais havera frames suficientes, mesmo com a memoria vazia);
       - tempo de processador nao positivo (nao ha instrucoes a executar).
 
-    Processos validos retornam True e seguem para o fluxo normal.
+    O aviso vai para stderr para nao poluir o stdout comparado com a
+    referencia. Processos validos retornam True e seguem o fluxo normal.
     """
+    motivo = None
     if processo.tamanho_working_set <= 0:
-        print("process {} =>".format(processo.pid))
-        print("P{} rejeitado: working set invalido ({}); precisa de ao menos "
-              "1 frame".format(processo.pid, processo.tamanho_working_set))
-        print()
-        return False
-    if not memoria.cabe_na_area(processo):
-        print("process {} =>".format(processo.pid))
-        print("P{} rejeitado: working set ({}) excede a memoria da area"
-              .format(processo.pid, processo.tamanho_working_set))
-        print()
-        return False
-    if processo.tempo_processador <= 0:
-        print("process {} =>".format(processo.pid))
-        print("P{} rejeitado: sem instrucoes a executar (tempo {})"
-              .format(processo.pid, processo.tempo_processador))
-        print()
+        motivo = ("working set invalido ({}); precisa de ao menos 1 frame"
+                  .format(processo.tamanho_working_set))
+    elif not memoria.cabe_na_area(processo):
+        motivo = ("working set ({}) excede a memoria da area"
+                  .format(processo.tamanho_working_set))
+    elif processo.tempo_processador <= 0:
+        motivo = ("sem instrucoes a executar (tempo {})"
+                  .format(processo.tempo_processador))
+    if motivo is not None:
+        _aviso("P{} rejeitado: {}".format(processo.pid, motivo))
         return False
     return True
 
@@ -199,12 +200,16 @@ def executar_operacoes(operacoes, sistema_arquivos, processos):
 
     por_pid = {p.pid: p for p in processos}
     for numero, operacao in enumerate(operacoes, start=1):
-        pid = operacao["pid"]
-        if pid not in por_pid:
+        if operacao.get("invalida"):
+            # Linha malformada no files.txt: falha a operacao com o motivo,
+            # preservando a numeracao das operacoes seguintes.
             sucesso = False
-            mensagem = "O processo {} não existe.".format(pid)
+            mensagem = operacao["motivo"]
+        elif operacao["pid"] not in por_pid:
+            sucesso = False
+            mensagem = "O processo {} não existe.".format(operacao["pid"])
         else:
-            processo = por_pid[pid]
+            processo = por_pid[operacao["pid"]]
             if operacao["codigo"] == 0:      # criar
                 sucesso, mensagem = sistema_arquivos.criar(
                     processo, operacao["nome"], operacao["blocos"])
@@ -246,26 +251,37 @@ def main():
     caminho_arquivos = sys.argv[2]
     caminho_strings = sys.argv[3]
 
-    # Leitura das entradas (formato validado no leitor).
+    # Leitura das entradas. O leitor ja tolera linhas invalidas (avisa em
+    # stderr); aqui tratamos apenas arquivos ilegiveis, degradando para o
+    # vazio em vez de abortar: a simulacao SEMPRE roda ate o fim, pois a
+    # saida sera comparada integralmente com a referencia.
+    processos = []
     try:
         processos = ler_processos(caminho_processos)
+    except OSError as erro:
+        _aviso("nao foi possivel ler '{}': {}".format(caminho_processos, erro))
+    try:
         ler_strings_referencia(caminho_strings, processos)
+    except OSError as erro:
+        _aviso("nao foi possivel ler '{}': {}".format(caminho_strings, erro))
+    total_blocos, preexistentes, operacoes = 0, [], []
+    try:
         total_blocos, preexistentes, operacoes = ler_arquivos(caminho_arquivos)
-    except (ValueError, OSError) as erro:
-        print("Erro na leitura das entradas: {}".format(erro))
-        return
+    except OSError as erro:
+        _aviso("nao foi possivel ler '{}': {}".format(caminho_arquivos, erro))
 
     # Gerenciadores.
     memoria = GerenciadorMemoria()
     recursos = GerenciadorRecursos()
     filas = GerenciadorFilas()
     sistema_arquivos = SistemaArquivos(total_blocos)
-    try:
-        for nome, inicio, tamanho in preexistentes:
+    for nome, inicio, tamanho in preexistentes:
+        try:
             sistema_arquivos.adicionar_preexistente(nome, inicio, tamanho)
-    except ValueError as erro:
-        print("Erro na configuracao do disco: {}".format(erro))
-        return
+        except ValueError as erro:
+            # Segmento impossivel (fora do disco, sobreposto ou duplicado):
+            # ignora SO o segmento e segue com o restante da simulacao.
+            _aviso("segmento pre-existente ignorado: {}".format(erro))
 
     # Execucao.
     escalonar(processos, memoria, recursos, filas)
