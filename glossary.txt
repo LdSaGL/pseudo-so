@@ -1,0 +1,13 @@
+SO multiprogramado -> mantem varios processos na memoria principal ao mesmo tempo e a CPU alterna entre eles
+
+Feedback -> forma de baixar a prioridade de um processo apos ele executar e nao concluir
+
+Aging -> forma de aumentar a prioridade de um processo quanto mais tempo ele ficar sem executar
+
+Preempcao -> capacidade do SO de tirar a CPU de um processo em execucao antes dele terminar ou bloquear vloluntariamente para dar a CPU a outro processo
+
+Paginacao -> tecnica que o SO usa para gerenciar memoria dividindo-a em blocos de tamanho fixo
+
+Memoria Virtual -> abstracao que usa paginacao para dar a ilusao que cada proceso tem um espaco de enderecamento proprio, continuo e maior que a RAM disponivel
+
+LRU -> pagina que nao eh utilizada ha mais tempo eh a primeira da lista para ser substituida
